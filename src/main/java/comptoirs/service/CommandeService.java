@@ -106,8 +106,35 @@ public class CommandeService {
      */
     @Transactional
     public Ligne ajouterLigne(int commandeNum, int produitRef, @Positive int quantite) {
-        // TODO : implémenter cette méthode
-        throw new UnsupportedOperationException("Pas encore implémenté");
+
+        //recupere produit
+        var produit = produitDao.findById(produitRef).orElseThrow();
+
+        // verification de produit
+    if (produit.isIndisponible()){
+        throw new IllegalArgumentException("Produit indisponible");
+    }
+
+    //recupere commande
+    var commande = commandeDao.findById(commandeNum).orElseThrow();
+
+    //verification de commande
+    if (commande.getEnvoyeele()!= null){
+        throw new IllegalStateException("commande déja envoyée");
+    }
+
+    //verification de stock
+    if (produit.getUnitesEnStock()< quantite){
+        throw new IllegalStateException("pas assez de produit en stock");
+    }
+
+    //creation de ligne
+    var nouvelleLigne = new Ligne(commande, produit, quantite);
+    ligneDao.save(nouvelleLigne);
+
+    //incrementation de quantité
+    produit.setUnitesCommandees(produit.getUnitesCommandees() + quantite );
+    return nouvelleLigne;
     }
 
     /**
@@ -130,7 +157,20 @@ public class CommandeService {
      */
     @Transactional
     public Commande enregistreExpedition(int commandeNum) {
-        // TODO : implémenter cette méthode
-        throw new UnsupportedOperationException("Pas encore implémenté");
+        //recupere commande
+       var commande = commandeDao.findById(commandeNum).orElseThrow();
+
+       //verification commande
+       if (commande.getEnvoyeele() != null){
+           throw new IllegalStateException("commande déja envoyée");
+       }
+        commande.setEnvoyeele(LocalDate.now());
+
+        commande.getLignes().forEach(ligne -> {
+            var p = ligne.getProduit();
+            p.setUnitesCommandees(p.getUnitesCommandees() - ligne.getQuantite());
+            p.setUnitesEnStock(p.getUnitesEnStock() - ligne.getQuantite());
+        });
+        return commande;
     }
 }
